@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-db-migrate
+  namespace: airflow-argocd
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: airflow-db-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-migrate
+          image: airflow-photoevent:1.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - >-
+              echo 'Starting database migration...' &&
+              airflow db migrate &&
+              echo 'Database migration completed!' &&
+              airflow users create
+              --username admin
+              --firstname Admin
+              --lastname Admin
+              --role Admin
+              --email admin@airflow.local
+              --password admin
+              2>/dev/null || echo 'Admin user already exists'
+          env:
+            - name: AIRFLOW_HOME
+              value: /opt/airflow
+            - name: AIRFLOW_CONFIG
+              value: /opt/airflow/airflow.cfg
+          volumeMounts:
+            - name: config
+              mountPath: /opt/airflow/airflow.cfg
+              subPath: airflow.cfg
+      volumes:
+        - name: config
+          configMap:
+            name: airflow-config

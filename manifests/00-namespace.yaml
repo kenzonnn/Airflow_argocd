@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airflow-argocd
+  labels:
+    managed-by: argocd
+    environment: test

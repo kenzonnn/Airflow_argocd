@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: airflow-argocd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      securityContext:
+        fsGroup: 50000
+      initContainers:
+        - name: git-sync-init
+          image: registry.k8s.io/git-sync/git-sync:v4.2.4
+          env:
+            - name: GITSYNC_REPO
+              value: https://gitlab.allence.cloud/clients-acp/photoevent/build/others/airflow.git
+            - name: GITSYNC_REF
+              value: main
+            - name: GITSYNC_ROOT
+              value: /opt/airflow/dags-source
+            - name: GITSYNC_LINK
+              value: current
+            - name: GITSYNC_ONE_TIME
+              value: "true"
+            - name: GITSYNC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-credentials
+                  key: username
+            - name: GITSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-credentials
+                  key: token
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags-source
+      containers:
+        - name: git-sync
+          image: registry.k8s.io/git-sync/git-sync:v4.2.4
+          env:
+            - name: GITSYNC_REPO
+              value: https://gitlab.allence.cloud/clients-acp/photoevent/build/others/airflow.git
+            - name: GITSYNC_REF
+              value: main
+            - name: GITSYNC_ROOT
+              value: /opt/airflow/dags-source
+            - name: GITSYNC_LINK
+              value: current
+            - name: GITSYNC_PERIOD
+              value: 30s
+            - name: GITSYNC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-credentials
+                  key: username
+            - name: GITSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-credentials
+                  key: token
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags-source
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        - name: scheduler
+          image: airflow-photoevent:1.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args: ["airflow scheduler"]
+          env:
+            - name: AIRFLOW_HOME
+              value: /opt/airflow
+            - name: AIRFLOW_CONFIG
+              value: /opt/airflow/airflow.cfg
+          volumeMounts:
+            - name: config
+              mountPath: /opt/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: dags
+              mountPath: /opt/airflow/dags-source
+              readOnly: true
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - airflow jobs check --job-type SchedulerJob --hostname $(hostname)
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: airflow-config
+        - name: dags
+          emptyDir: {}

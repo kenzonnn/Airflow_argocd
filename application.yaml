@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow-test
+  namespace: argocd
+spec:
+  project: default
+
+  # WHERE: Git repo to watch
+  source:
+    repoURL: https://github.com/kenzonnn/Airflow_argocd.git
+    targetRevision: main
+    path: manifests
+
+  # WHAT: cluster + namespace to deploy into
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airflow-argocd
+
+  # HOW: behavior on changes
+  syncPolicy:
+    automated:
+      prune: true        # delete resources removed from Git
+      selfHeal: true     # revert manual edits in cluster
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

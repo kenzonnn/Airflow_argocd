@@ -1,0 +1,26 @@
+# ============================================================
+# ArgoCD repository declaration via Secret manifest.
+#
+# ArgoCD looks for Secrets in its namespace with the label
+# `argocd.argoproj.io/secret-type: repository`. Each such Secret
+# becomes a registered repository in the UI/Settings/Repositories.
+#
+# Apply with: kubectl apply -f argocd-repo.yaml
+# ============================================================
+
+# ---- Version PUBLIC repo (current case for kenzonnn/Airflow_argocd) ----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-argocd-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/kenzonnn/Airflow_argocd.git
+  # No username/password needed for public repos.
+  # If you switch the repo to PRIVATE, uncomment and fill in below:
+  # username: kenzonnn
+  # password: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
